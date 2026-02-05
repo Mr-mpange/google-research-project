@@ -147,14 +147,6 @@ class USSDService {
 
   // Handle main menu
   async handleMainMenu(session, input, language) {
-    // Debug logging
-    logger.info('Main menu debug', {
-      input: input,
-      inputType: typeof input,
-      inputLength: input ? input.length : 'null/undefined',
-      inputValue: JSON.stringify(input)
-    });
-
     switch (input) {
       case '': // Initial request - show main menu
       case undefined:

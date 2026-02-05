@@ -77,10 +77,40 @@ gcloud iam service-accounts keys create credentials/google-credentials.json \
 
 ### 4. Database Setup
 
+**Option A: Automatic Setup (Recommended)**
 ```bash
-# Run migrations and seed data
+# Run migrations and seed data in one command
+npm run db:reset
+```
+
+**Option B: Step by Step**
+```bash
+# 1. Run database migrations (create tables)
+npm run db:migrate
+
+# 2. Seed database with sample data
+npm run db:seed
+```
+
+**Option C: Manual PostgreSQL Setup**
+```bash
+# Connect to PostgreSQL and create database
+psql -U postgres
+CREATE DATABASE research_system;
+\q
+
+# Then run migrations
 npm run db:migrate
 npm run db:seed
+```
+
+**Verify Database Setup:**
+```bash
+# Check if tables were created successfully
+psql -U postgres -d research_system -c "\dt"
+
+# View sample data
+psql -U postgres -d research_system -c "SELECT COUNT(*) FROM research_questions;"
 ```
 
 ### 5. Start Development Server
@@ -251,6 +281,36 @@ docker run -d \
 | 🔒 Security | ✅ | JWT, rate limiting |
 | 🐳 Docker | ✅ | Container deployment |
 
+## 🗄️ Database Schema
+
+The system uses PostgreSQL with the following main tables:
+
+| Table | Purpose |
+|-------|---------|
+| `users` | System administrators and researchers |
+| `research_questions` | Survey questions (multilingual) |
+| `research_responses` | User responses via USSD/Voice |
+| `ussd_sessions` | USSD session management |
+| `voice_calls` | Voice call tracking |
+| `transcriptions` | AI speech-to-text results |
+| `ai_summaries` | Gemini AI analysis results |
+| `research_campaigns` | Research project management |
+| `participants` | User demographics (optional) |
+
+### Database Commands
+
+```bash
+# Setup database from scratch
+npm run db:migrate    # Create all tables and indexes
+npm run db:seed       # Add sample questions and admin user
+
+# Quick reset (development)
+npm run db:reset      # Drop, recreate, and seed
+
+# Production backup
+pg_dump research_system > backup_$(date +%Y%m%d).sql
+```
+
 ## 🌍 Multilingual Support
 
 The system supports multiple languages with easy extensibility:
@@ -292,9 +352,29 @@ npm run dev          # Start development server
 npm run start        # Start production server
 npm run test         # Run tests
 npm run lint         # Run ESLint
-npm run db:migrate   # Run database migrations
+npm run db:migrate   # Run database migrations (create tables)
 npm run db:seed      # Seed database with sample data
+npm run db:reset     # Reset database (migrate + seed)
 npm run worker:ai    # Start AI processing worker
+```
+
+### Database Management
+
+```bash
+# Create database tables
+npm run db:migrate
+
+# Add sample research questions and admin user
+npm run db:seed
+
+# Reset entire database (drop + recreate + seed)
+npm run db:reset
+
+# Backup database (PostgreSQL)
+pg_dump research_system > backup.sql
+
+# Restore database (PostgreSQL)
+psql research_system < backup.sql
 ```
 
 ### Project Structure
