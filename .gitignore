@@ -8,7 +8,7 @@ node_modules/
 
 # Logs
 logs/
-*.log
+*.log 
 
 # Database backups
 *.sql
