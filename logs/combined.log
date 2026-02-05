@@ -229,3 +229,4 @@
 {"input":"","inputLength":"null/undefined","inputType":"string","inputValue":"\"\"","level":"info","message":"Main menu debug","service":"research-system","timestamp":"2026-02-04T21:40:23.569Z"}
 {"action":"response_sent","level":"info","menuLevel":"main","message":"USSD Activity","phoneNumber":"+255683859574","responseType":"CON","service":"research-system","sessionId":"ATUid_8f3466f56b102be97f7afd0c7ae04331","timestamp":"2026-02-04T21:40:23.598Z","type":"ussd"}
 {"level":"info","message":"::1 - - [04/Feb/2026:21:40:23 +0000] \"POST /ussd/callback HTTP/1.1\" 200 167 \"-\" \"at-ussd-api/1.0\"","service":"research-system","timestamp":"2026-02-04T21:40:23.664Z"}
+{"level":"info","message":"Server running on port 3000 in development mode","service":"research-system","timestamp":"2026-02-04T21:54:49.146Z"}
