@@ -215,6 +215,15 @@ GET /api/responses
 GET /api/analytics
 ```
 
+### SMS Endpoints
+```http
+POST /sms/thank-you      # Send thank you SMS (Admin/Researcher)
+POST /sms/invite         # Send research invitations (Admin/Researcher)  
+POST /sms/bulk           # Send bulk SMS (Admin only)
+GET /sms/statistics      # Get SMS statistics
+POST /sms/delivery-report # SMS delivery webhook
+```
+
 ## 🧪 Testing
 
 ### Test USSD with Postman

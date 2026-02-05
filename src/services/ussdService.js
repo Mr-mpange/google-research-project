@@ -1,6 +1,7 @@
 const db = require('../database/connection');
 const logger = require('../utils/logger');
 const voiceService = require('./voiceService');
+const smsService = require('./smsService');
 
 class USSDService {
   constructor() {
@@ -340,9 +341,18 @@ class USSDService {
         responseLength: input.length
       });
 
+      // Send thank you SMS asynchronously (don't wait for it)
+      this.sendThankYouSMS(session.phone_number, language, selectedQuestion)
+        .catch(error => {
+          logger.error('Failed to send thank you SMS', {
+            phoneNumber: session.phone_number,
+            error: error.message
+          });
+        });
+
       return {
         type: 'END',
-        message: this.getText('response_saved', language)
+        message: this.getText('response_saved_with_sms', language)
       };
 
     } catch (error) {
@@ -351,6 +361,37 @@ class USSDService {
         type: 'END',
         message: this.getText('response_save_error', language)
       };
+    }
+  }
+
+  // Send thank you SMS (async helper)
+  async sendThankYouSMS(phoneNumber, language, questionDetails) {
+    try {
+      // Clean phone number format (remove URL encoding if present)
+      const cleanPhoneNumber = decodeURIComponent(phoneNumber);
+      
+      logger.info('Preparing to send thank you SMS', {
+        originalPhone: phoneNumber,
+        cleanPhone: cleanPhoneNumber,
+        language,
+        questionTitle: questionDetails.title
+      });
+
+      await smsService.sendThankYouSMS(cleanPhoneNumber, language, {
+        questionTitle: questionDetails.title,
+        questionText: questionDetails.question_text
+      });
+      
+      logger.info('Thank you SMS sent successfully', {
+        phoneNumber: cleanPhoneNumber,
+        questionTitle: questionDetails.title
+      });
+    } catch (error) {
+      logger.error('Thank you SMS failed', {
+        phoneNumber,
+        error: error.message,
+        stack: error.stack
+      });
     }
   }
 
@@ -477,6 +518,7 @@ class USSDService {
         back_to_main: 'Back to Main Menu',
         type_answer: 'Please type your answer:',
         response_saved: 'Thank you! Your response has been saved.',
+        response_saved_with_sms: 'Thank you! Your response has been saved. You will receive a confirmation SMS shortly.',
         response_save_error: 'Error saving response. Please try again.'
       },
       sw: {
@@ -495,6 +537,7 @@ class USSDService {
         back_to_main: 'Rudi kwenye Menyu Kuu',
         type_answer: 'Tafadhali andika jibu lako:',
         response_saved: 'Asante! Jibu lako limehifadhiwa.',
+        response_saved_with_sms: 'Asante! Jibu lako limehifadhiwa. Utapokea ujumbe wa uthibitisho hivi karibuni.',
         response_save_error: 'Hitilafu katika kuhifadhi jibu. Tafadhali jaribu tena.'
       }
     };

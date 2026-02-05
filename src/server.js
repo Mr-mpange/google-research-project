@@ -13,6 +13,7 @@ const rateLimiter = require('./middleware/rateLimiter');
 // Route imports
 const ussdRoutes = require('./routes/ussd');
 const voiceRoutes = require('./routes/voice');
+const smsRoutes = require('./routes/sms');
 const dashboardRoutes = require('./routes/dashboard');
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
@@ -81,6 +82,7 @@ app.post('/test/ussd', (req, res) => {
 // Routes
 app.use('/ussd', ussdRoutes);
 app.use('/voice', voiceRoutes);
+app.use('/sms', smsRoutes);
 app.use('/auth', authRoutes);
 app.use('/api', apiRoutes);
 app.use('/', dashboardRoutes);
