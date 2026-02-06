@@ -88,21 +88,25 @@ class SMSService {
     
     // Ensure it starts with + for international format
     if (!cleaned.startsWith('+')) {
-      // If it starts with 0, replace with country code (assuming Kenya +254)
+      // If it starts with 0, replace with country code (assuming Tanzania +255)
       if (cleaned.startsWith('0')) {
-        cleaned = '+254' + cleaned.substring(1);
+        cleaned = '+255' + cleaned.substring(1);
       } 
-      // If it starts with 254, add +
+      // If it starts with 255, add +
+      else if (cleaned.startsWith('255')) {
+        cleaned = '+' + cleaned;
+      }
+      // If it starts with 254 (Kenya), add +
       else if (cleaned.startsWith('254')) {
         cleaned = '+' + cleaned;
       }
-      // If it's just digits and looks like a Kenyan number, add +254
-      else if (/^[17]\d{8}$/.test(cleaned)) {
-        cleaned = '+254' + cleaned;
+      // If it's just digits and looks like a Tanzanian number (6-7 digits), add +255
+      else if (/^[67]\d{8}$/.test(cleaned)) {
+        cleaned = '+255' + cleaned;
       }
-      // Otherwise, assume it needs +254
+      // Otherwise, assume it needs +255
       else if (!/^\+/.test(cleaned)) {
-        cleaned = '+254' + cleaned;
+        cleaned = '+255' + cleaned;
       }
     }
     
