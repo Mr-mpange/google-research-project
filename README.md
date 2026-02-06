@@ -68,7 +68,36 @@ An intelligent system that works on **ANY mobile phone** using:
 
 ---
 
-## 🚀 Quick Deploy to Google Cloud Run (BONUS POINTS!)
+## ⚡ Super Quick Start (3 Commands!)
+
+### Deploy to Google Cloud Run in 3 Steps:
+
+```bash
+# 1. Clone repository
+git clone https://github.com/Mr-mpange/google-research-project.git
+cd google-research-project
+
+# 2. Run deployment script (Windows)
+.\deploy.ps1
+
+# OR (Mac/Linux)
+chmod +x deploy.sh && ./deploy.sh
+
+# 3. Done! Your app is live on Google Cloud Run! 🎉
+```
+
+**That's it!** The script handles everything:
+- ✅ Enables Google Cloud APIs
+- ✅ Stores secrets securely
+- ✅ Creates database (optional)
+- ✅ Deploys to Cloud Run
+- ✅ Tests deployment
+
+**📖 Detailed Guide:** [QUICK_START.md](QUICK_START.md)
+
+---
+
+## 🚀 Manual Deploy to Google Cloud Run (BONUS POINTS!)
 
 ### One-Command Deploy
 
