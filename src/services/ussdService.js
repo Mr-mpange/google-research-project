@@ -228,7 +228,11 @@ class USSDService {
 
   // Handle info menu
   async handleInfoMenu(session, input, language) {
-    switch (input) {
+    // Extract the last input (after the last *)
+    const parts = input.split('*');
+    const lastInput = parts[parts.length - 1];
+    
+    switch (lastInput) {
       case '1': // About This Research
         return {
           type: 'END',
@@ -269,13 +273,38 @@ class USSDService {
         };
     }
   }
+        return {
+          type: 'END',
+          message: this.getText('contact_info', language)
+        };
+
+      case '0': // Back to Main Menu
+        await this.updateSessionMenu(session.session_id, 'main');
+        return {
+          type: 'CON',
+          message: this.buildMenu('main', language),
+          menuLevel: 'main'
+        };
+
+      default:
+        return {
+          type: 'CON',
+          message: this.getText('invalid_option', language) + '\n\n' + this.buildMenu('info', language),
+          menuLevel: 'info'
+        };
+    }
+  }
 
   // Handle questions menu
   async handleQuestionsMenu(session, input, language) {
     const menuData = session.menu_data || {};
     const questions = menuData.questions || [];
+    
+    // Extract the last input (after the last *)
+    const parts = input.split('*');
+    const lastInput = parts[parts.length - 1];
 
-    if (input === '0') {
+    if (lastInput === '0') {
       await this.updateSessionMenu(session.session_id, 'main');
       return {
         type: 'CON',
@@ -284,7 +313,7 @@ class USSDService {
       };
     }
 
-    const questionIndex = parseInt(input) - 1;
+    const questionIndex = parseInt(lastInput) - 1;
     if (questionIndex >= 0 && questionIndex < questions.length) {
       const selectedQuestion = questions[questionIndex];
       await this.updateSessionMenu(session.session_id, 'question_answer', {
@@ -397,7 +426,11 @@ class USSDService {
 
   // Handle language menu
   async handleLanguageMenu(session, input) {
-    switch (input) {
+    // Extract the last input (after the last *)
+    const parts = input.split('*');
+    const lastInput = parts[parts.length - 1];
+    
+    switch (lastInput) {
       case '1': // English
         await this.updateSessionMenu(session.session_id, 'main', { language: 'en' });
         return {
