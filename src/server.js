@@ -19,7 +19,7 @@ const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080; // Cloud Run uses 8080 by default
 
 // Security middleware
 app.use(helmet());

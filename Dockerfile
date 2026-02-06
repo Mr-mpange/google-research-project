@@ -39,12 +39,12 @@ RUN mkdir -p uploads/audio logs && \
 # Switch to non-root user
 USER nodejs
 
-# Expose port
-EXPOSE 3000
+# Expose port (Cloud Run uses PORT environment variable, defaults to 8080)
+EXPOSE 8080
 
-# Health check
+# Health check (use PORT env var for Cloud Run compatibility)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
 # Start application
 CMD ["npm", "start"]
