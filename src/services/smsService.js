@@ -25,10 +25,10 @@ class SMSService {
     try {
       logger.info('Testing Africa\'s Talking connection');
       
-      // Try to send to a test number (won't actually send in sandbox)
+      // Try to send to a valid test number format
       const result = await this.sms.send({
-        to: ['+255000000000'],
-        message: 'Test connection'
+        to: ['+255683859574'], // Use actual valid number format
+        message: 'Test connection - ignore this message'
       });
       
       logger.info('Connection test result', { result });
