@@ -32,6 +32,11 @@ const query = async (text, params) => {
     return res;
   } catch (error) {
     logger.error('PostgreSQL query error:', error);
+    // Return empty result if database is not available
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      logger.warn('Database not available, returning empty result');
+      return { rows: [], rowCount: 0 };
+    }
     throw error;
   }
 };
