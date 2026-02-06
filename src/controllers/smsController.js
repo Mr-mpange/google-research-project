@@ -242,6 +242,27 @@ class SMSController {
       });
     }
   }
+
+  // Test Africa's Talking connection
+  async testConnection(req, res) {
+    try {
+      logger.info('Testing Africa\'s Talking connection via API');
+      
+      const result = await smsService.testConnection();
+      
+      res.json({
+        message: 'Connection test completed',
+        ...result
+      });
+
+    } catch (error) {
+      logger.error('Connection test error:', error);
+      res.status(500).json({
+        error: 'Connection test failed',
+        details: error.message
+      });
+    }
+  }
 }
 
 module.exports = new SMSController();

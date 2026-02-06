@@ -7,6 +7,9 @@ const rateLimiter = require('../middleware/rateLimiter');
 // Public endpoints (Africa's Talking webhooks)
 router.post('/delivery-report', rateLimiter.general, smsController.handleDeliveryReport);
 
+// Test connection endpoint (public for debugging)
+router.get('/test-connection', smsController.testConnection);
+
 // Protected endpoints (require authentication)
 router.use(authenticate);
 

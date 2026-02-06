@@ -3,12 +3,44 @@ const logger = require('../utils/logger');
 
 class SMSService {
   constructor() {
+    // Log initialization (mask sensitive data)
+    logger.info('Initializing Africa\'s Talking SMS Service', {
+      username: process.env.AT_USERNAME,
+      apiKeyLength: process.env.AT_API_KEY?.length,
+      apiKeyPrefix: process.env.AT_API_KEY?.substring(0, 10) + '...'
+    });
+
     this.client = AfricasTalking({
       apiKey: process.env.AT_API_KEY,
       username: process.env.AT_USERNAME
     });
     
     this.sms = this.client.SMS;
+    
+    logger.info('Africa\'s Talking SMS Service initialized successfully');
+  }
+
+  // Test connection to Africa's Talking
+  async testConnection() {
+    try {
+      logger.info('Testing Africa\'s Talking connection');
+      
+      // Try to send to a test number (won't actually send in sandbox)
+      const result = await this.sms.send({
+        to: ['+255000000000'],
+        message: 'Test connection'
+      });
+      
+      logger.info('Connection test result', { result });
+      return { success: true, result };
+    } catch (error) {
+      logger.error('Connection test failed', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      return { success: false, error: error.message };
+    }
   }
 
   // Send thank you SMS after research completion
@@ -23,7 +55,10 @@ class SMSService {
         cleanPhone: cleanPhoneNumber,
         language,
         messageLength: message.length,
-        questionTitle: responseDetails.questionTitle
+        questionTitle: responseDetails.questionTitle,
+        username: process.env.AT_USERNAME,
+        apiKeyPresent: !!process.env.AT_API_KEY,
+        apiKeyLength: process.env.AT_API_KEY?.length
       });
 
       const sendOptions = {
@@ -36,7 +71,18 @@ class SMSService {
         sendOptions.from = process.env.AT_SHORTCODE;
       }
 
+      logger.info('SMS send options', { 
+        to: sendOptions.to, 
+        messageLength: sendOptions.message.length,
+        hasFrom: !!sendOptions.from 
+      });
+
       const result = await this.sms.send(sendOptions);
+
+      logger.info('SMS API response received', { 
+        result: JSON.stringify(result),
+        recipients: result.SMSMessageData?.Recipients 
+      });
 
       const recipient = result.SMSMessageData?.Recipients?.[0];
       
@@ -65,13 +111,18 @@ class SMSService {
       logger.error('Failed to send thank you SMS', {
         phoneNumber,
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        headers: error.response?.headers
       });
 
       return {
         success: false,
         error: error.message,
-        phoneNumber
+        phoneNumber,
+        details: error.response?.data
       };
     }
   }
