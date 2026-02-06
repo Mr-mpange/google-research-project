@@ -214,53 +214,12 @@ class SMSService {
   // Build thank you message based on language
   buildThankYouMessage(language = 'en', responseDetails = {}) {
     const messages = {
-      en: {
-        basic: `Thank you for participating in our research! Your response has been recorded and will help improve services in your community. 
-
-Your participation makes a difference! 
-
-Research Team
-${process.env.ORGANIZATION_NAME || 'Community Research'}`,
-        
-        detailed: `Thank you for completing our research survey! 
-
-✅ Your response to "${responseDetails.questionTitle || 'our question'}" has been recorded.
-
-Your insights help us understand community needs and improve services. We truly appreciate the time you took to share your thoughts.
-
-🙏 Thank you for making a difference!
-
-Research Team
-${process.env.ORGANIZATION_NAME || 'Community Research'}
-Info: Dial ${process.env.USSD_CODE || '*384*34153#'} anytime to participate again.`
-      },
+      en: `Thank you for participating in our research! Your response has been recorded.`,
       
-      sw: {
-        basic: `Asante kwa kushiriki katika utafiti wetu! Jibu lako limerekodiwa na litasaidia kuboresha huduma katika jamii yako.
-
-Ushiriki wako unamaana!
-
-Timu ya Utafiti
-${process.env.ORGANIZATION_NAME || 'Utafiti wa Jamii'}`,
-        
-        detailed: `Asante kwa kukamilisha utafiti wetu!
-
-✅ Jibu lako kwa "${responseDetails.questionTitle || 'swali letu'}" limerekodiwa.
-
-Maoni yako yanasaidia kuelewa mahitaji ya jamii na kuboresha huduma. Tunashukuru muda uliochukua kushiriki mawazo yako.
-
-🙏 Asante kwa kuleta mabadiliko!
-
-Timu ya Utafiti
-${process.env.ORGANIZATION_NAME || 'Utafiti wa Jamii'}
-Taarifa: Piga ${process.env.USSD_CODE || '*384*34153#'} wakati wowote kushiriki tena.`
-      }
+      sw: `Asante kwa kushiriki katika utafiti wetu! Jibu lako limerekodiwa.`
     };
 
-    const langMessages = messages[language] || messages.en;
-    
-    // Use detailed message if we have response details, otherwise basic
-    return responseDetails.questionTitle ? langMessages.detailed : langMessages.basic;
+    return messages[language] || messages.en;
   }
 
   // Build research invitation message
