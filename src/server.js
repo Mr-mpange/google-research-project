@@ -21,6 +21,9 @@ const apiRoutes = require('./routes/api');
 const app = express();
 const PORT = process.env.PORT || 8080; // Cloud Run uses 8080 by default
 
+// Trust proxy for Cloud Run (required for rate limiting and IP detection)
+app.set('trust proxy', true);
+
 // Security middleware
 app.use(helmet());
 app.use(cors({
