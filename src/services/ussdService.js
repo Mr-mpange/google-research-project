@@ -275,14 +275,6 @@ class USSDService {
   }
 
   // Handle questions menu
-          type: 'CON',
-          message: this.getText('invalid_option', language) + '\n\n' + this.buildMenu('info', language),
-          menuLevel: 'info'
-        };
-    }
-  }
-
-  // Handle questions menu
   async handleQuestionsMenu(session, input, language) {
     const menuData = session.menu_data || {};
     const questions = menuData.questions || [];
