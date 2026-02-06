@@ -26,11 +26,17 @@ class SMSService {
         questionTitle: responseDetails.questionTitle
       });
 
-      const result = await this.sms.send({
+      const sendOptions = {
         to: cleanPhoneNumber,
-        message: message,
-        from: process.env.AT_SHORTCODE || null // Use shortcode if available
-      });
+        message: message
+      };
+      
+      // Only add 'from' if shortcode is available
+      if (process.env.AT_SHORTCODE) {
+        sendOptions.from = process.env.AT_SHORTCODE;
+      }
+
+      const result = await this.sms.send(sendOptions);
 
       const recipient = result.SMSMessageData?.Recipients?.[0];
       
@@ -113,11 +119,17 @@ class SMSService {
         language
       });
 
-      const result = await this.sms.send({
+      const sendOptions = {
         to: phoneNumber,
-        message: message,
-        from: process.env.AT_SHORTCODE || null
-      });
+        message: message
+      };
+      
+      // Only add 'from' if shortcode is available
+      if (process.env.AT_SHORTCODE) {
+        sendOptions.from = process.env.AT_SHORTCODE;
+      }
+
+      const result = await this.sms.send(sendOptions);
 
       logger.info('Research invitation SMS sent', {
         phoneNumber,
@@ -238,11 +250,17 @@ ${process.env.ORGANIZATION_NAME || 'Utafiti wa Jamii'}`
         messageLength: message.length
       });
 
-      const result = await this.sms.send({
+      const sendOptions = {
         to: phoneNumbers,
-        message: message,
-        from: process.env.AT_SHORTCODE || null
-      });
+        message: message
+      };
+      
+      // Only add 'from' if shortcode is available
+      if (process.env.AT_SHORTCODE) {
+        sendOptions.from = process.env.AT_SHORTCODE;
+      }
+
+      const result = await this.sms.send(sendOptions);
 
       const recipients = result.SMSMessageData?.Recipients || [];
       const successful = recipients.filter(r => r.status === 'Success').length;
