@@ -273,21 +273,8 @@ class USSDService {
         };
     }
   }
-        return {
-          type: 'END',
-          message: this.getText('contact_info', language)
-        };
 
-      case '0': // Back to Main Menu
-        await this.updateSessionMenu(session.session_id, 'main');
-        return {
-          type: 'CON',
-          message: this.buildMenu('main', language),
-          menuLevel: 'main'
-        };
-
-      default:
-        return {
+  // Handle questions menu
           type: 'CON',
           message: this.getText('invalid_option', language) + '\n\n' + this.buildMenu('info', language),
           menuLevel: 'info'
