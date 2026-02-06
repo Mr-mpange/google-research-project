@@ -33,15 +33,13 @@ const logger = winston.createLogger({
   ]
 });
 
-// If we're not in production, log to console as well
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple()
-    )
-  }));
-}
+// Always log to console for Cloud Run visibility
+logger.add(new winston.transports.Console({
+  format: winston.format.combine(
+    winston.format.colorize(),
+    winston.format.simple()
+  )
+}));
 
 // Custom logging methods for specific use cases
 logger.ussd = (phoneNumber, action, data = {}) => {
