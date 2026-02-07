@@ -10,6 +10,9 @@ router.use(rateLimiter.general);
 // Public health check
 router.get('/health', apiController.getHealth);
 
+// Public AI test (for debugging)
+router.get('/ai-status', apiController.getAIStatus);
+
 // Protected routes (require authentication)
 router.use(authenticate);
 

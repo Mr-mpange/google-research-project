@@ -422,6 +422,40 @@ class APIController {
     }
   }
 
+  // Get AI service status (public endpoint)
+  async getAIStatus(req, res) {
+    try {
+      const status = aiService.getServiceStatus();
+      
+      // Test with a simple text if requested
+      const testText = req.query.test;
+      let testResult = null;
+      
+      if (testText && status.gemini.available) {
+        try {
+          testResult = await aiService.analyzeWithGemini(testText, 'summary');
+        } catch (error) {
+          testResult = { error: error.message };
+        }
+      }
+
+      res.json({
+        success: true,
+        status,
+        testResult,
+        message: 'AI service is configured and ready'
+      });
+
+    } catch (error) {
+      logger.error('AI status API error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to get AI status',
+        details: error.message 
+      });
+    }
+  }
+
   // Get system health status
   async getHealth(req, res) {
     try {
