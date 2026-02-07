@@ -32,3 +32,14 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+*.tmp
+
+# Build files
+dist/
+build/
+
+# Cloud SQL Proxy
+cloud_sql_proxy*
+
+# Uploads
+uploads/
