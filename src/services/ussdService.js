@@ -126,6 +126,9 @@ class USSDService {
         case 'questions':
           return await this.handleQuestionsMenu(session, input, language);
         
+        case 'sequential_questions':
+          return await this.handleSequentialQuestions(session, input, language);
+        
         case 'question_answer':
           return await this.handleQuestionAnswer(session, input, language);
         
@@ -175,11 +178,19 @@ class USSDService {
           };
         }
         
-        await this.updateSessionMenu(session.session_id, 'questions', { questions });
+        // Start sequential question flow
+        await this.updateSessionMenu(session.session_id, 'sequential_questions', { 
+          questions,
+          currentQuestionIndex: 0,
+          answers: []
+        });
+        
+        // Show first question
+        const firstQuestion = questions[0];
         return {
           type: 'CON',
-          message: this.buildQuestionsMenu(questions, language),
-          menuLevel: 'questions'
+          message: `${this.getText('question', language)} 1/${questions.length}\n\n${firstQuestion.question_text}\n\n${this.getText('type_answer', language)}`,
+          menuLevel: 'sequential_questions'
         };
 
       case '3': // Record Voice Response
@@ -312,6 +323,87 @@ class USSDService {
       message: this.getText('invalid_option', language) + '\n\n' + this.buildQuestionsMenu(questions, language),
       menuLevel: 'questions'
     };
+  }
+
+  // Handle sequential questions (one by one)
+  async handleSequentialQuestions(session, input, language) {
+    try {
+      const menuData = session.menu_data || {};
+      const questions = menuData.questions || [];
+      const currentIndex = menuData.currentQuestionIndex || 0;
+      const answers = menuData.answers || [];
+
+      // Save the answer for current question
+      const currentQuestion = questions[currentIndex];
+      answers.push({
+        questionId: currentQuestion.id,
+        questionText: currentQuestion.question_text,
+        answer: input
+      });
+
+      // Save to database
+      await db.query(`
+        INSERT INTO research_responses (
+          phone_number, question_id, response_type, response_text, 
+          ussd_session_id, language
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        session.phone_number,
+        currentQuestion.id,
+        'ussd',
+        input,
+        session.id,
+        language
+      ]);
+
+      logger.ussd(session.phone_number, 'sequential_answer_saved', {
+        questionIndex: currentIndex + 1,
+        totalQuestions: questions.length,
+        questionId: currentQuestion.id
+      });
+
+      // Check if there are more questions
+      const nextIndex = currentIndex + 1;
+      
+      if (nextIndex < questions.length) {
+        // Show next question
+        const nextQuestion = questions[nextIndex];
+        await this.updateSessionMenu(session.session_id, 'sequential_questions', {
+          questions,
+          currentQuestionIndex: nextIndex,
+          answers
+        });
+
+        return {
+          type: 'CON',
+          message: `${this.getText('question', language)} ${nextIndex + 1}/${questions.length}\n\n${nextQuestion.question_text}\n\n${this.getText('type_answer', language)}`,
+          menuLevel: 'sequential_questions'
+        };
+      } else {
+        // All questions completed - send SMS and end
+        this.sendThankYouSMS(session.phone_number, language, {
+          title: this.getText('all_questions_completed', language),
+          totalAnswered: answers.length
+        }).catch(error => {
+          logger.error('Failed to send completion SMS', {
+            phoneNumber: session.phone_number,
+            error: error.message
+          });
+        });
+
+        return {
+          type: 'END',
+          message: this.getText('all_questions_completed_message', language).replace('{count}', answers.length)
+        };
+      }
+
+    } catch (error) {
+      logger.error('Sequential questions error:', error);
+      return {
+        type: 'END',
+        message: this.getText('response_save_error', language)
+      };
+    }
   }
 
   // Handle question answer
@@ -528,10 +620,13 @@ class USSDService {
         contact_info: 'For questions, contact: research@example.com or call +254700000000',
         select_question: 'Select a question to answer:',
         back_to_main: 'Back to Main Menu',
+        question: 'Question',
         type_answer: 'Please type your answer:',
         response_saved: 'Thank you! Your response has been saved.',
         response_saved_with_sms: 'Thank you! Your response has been saved. You will receive a confirmation SMS shortly.',
-        response_save_error: 'Error saving response. Please try again.'
+        response_save_error: 'Error saving response. Please try again.',
+        all_questions_completed: 'All Questions Completed',
+        all_questions_completed_message: 'Thank you! You have completed all {count} questions. Your responses have been saved. You will receive a confirmation SMS shortly.'
       },
       sw: {
         error_message: 'Samahani, kumekuwa na hitilafu. Tafadhali jaribu tena baadaye.',
@@ -547,10 +642,13 @@ class USSDService {
         contact_info: 'Kwa maswali, wasiliana: research@example.com au piga simu +254700000000',
         select_question: 'Chagua swali la kujibu:',
         back_to_main: 'Rudi kwenye Menyu Kuu',
+        question: 'Swali',
         type_answer: 'Tafadhali andika jibu lako:',
         response_saved: 'Asante! Jibu lako limehifadhiwa.',
         response_saved_with_sms: 'Asante! Jibu lako limehifadhiwa. Utapokea ujumbe wa uthibitisho hivi karibuni.',
-        response_save_error: 'Hitilafu katika kuhifadhi jibu. Tafadhali jaribu tena.'
+        response_save_error: 'Hitilafu katika kuhifadhi jibu. Tafadhali jaribu tena.',
+        all_questions_completed: 'Maswali Yote Yamekamilika',
+        all_questions_completed_message: 'Asante! Umekamilisha maswali yote {count}. Majibu yako yamehifadhiwa. Utapokea ujumbe wa uthibitisho hivi karibuni.'
       }
     };
 
