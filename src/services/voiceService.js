@@ -59,7 +59,7 @@ class VoiceService {
   // Generate voice response XML
   async generateVoiceResponse(callData) {
     try {
-      const { sessionId, phoneNumber, isActive } = callData;
+      const { sessionId, phoneNumber, isActive, dtmfDigits } = callData;
       
       // Get or create call record
       let call = await this.getCallBySessionId(sessionId);
@@ -73,7 +73,8 @@ class VoiceService {
       logger.voice(phoneNumber, 'generating_response', {
         sessionId,
         step: callState.step,
-        language
+        language,
+        dtmfDigits
       });
 
       let response = '<?xml version="1.0" encoding="UTF-8"?><Response>';
@@ -89,14 +90,45 @@ class VoiceService {
           this.callStates.set(sessionId, { step: 'waiting_input', language });
           break;
 
-        case 'question_prompt':
-          const question = callState.currentQuestion;
-          response += this.generateQuestionResponse(question, language);
-          this.callStates.set(sessionId, { 
-            ...callState, 
-            step: 'recording',
-            recordingStarted: true
-          });
+        case 'waiting_input':
+          // Handle menu selection
+          if (dtmfDigits === '1') {
+            // Start sequential questions
+            const questions = await this.getActiveQuestions(language);
+            if (questions.length === 0) {
+              response += `<Say voice="woman">${language === 'sw' ? 'Hakuna maswali ya utafiti kwa sasa.' : 'No research questions available at the moment.'}</Say><Hangup/>`;
+            } else {
+              this.callStates.set(sessionId, { 
+                step: 'sequential_questions',
+                language,
+                questions,
+                currentQuestionIndex: 0,
+                answers: []
+              });
+              response += this.generateQuestionResponse(questions[0], language, 1, questions.length);
+            }
+          } else {
+            response += this.generateDefaultResponse(language);
+          }
+          break;
+
+        case 'sequential_questions':
+          // This step is reached after recording is complete
+          const nextIndex = callState.currentQuestionIndex + 1;
+          
+          if (nextIndex < callState.questions.length) {
+            // More questions to ask
+            const nextQuestion = callState.questions[nextIndex];
+            this.callStates.set(sessionId, {
+              ...callState,
+              currentQuestionIndex: nextIndex
+            });
+            response += this.generateQuestionResponse(nextQuestion, language, nextIndex + 1, callState.questions.length);
+          } else {
+            // All questions completed
+            response += this.generateCompleteResponse(language);
+            this.callStates.delete(sessionId);
+          }
           break;
 
         case 'recording':
@@ -158,18 +190,23 @@ class VoiceService {
   }
 
   // Generate question response
-  generateQuestionResponse(question, language) {
+  generateQuestionResponse(question, language, questionNumber, totalQuestions) {
     const prompts = {
-      en: 'Please answer the following question after the beep. You have up to 2 minutes to respond.',
-      sw: 'Tafadhali jibu swali lifuatalo baada ya mlio. Una dakika 2 kujibu.'
+      en: `Question ${questionNumber} of ${totalQuestions}. Please answer after the beep. You have up to 2 minutes to respond.`,
+      sw: `Swali ${questionNumber} kati ya ${totalQuestions}. Tafadhali jibu baada ya mlio. Una dakika 2 kujibu.`
+    };
+
+    const speakPrompt = {
+      en: 'Please speak after the beep.',
+      sw: 'Tafadhali ongea baada ya mlio.'
     };
 
     return `
       <Say voice="woman">${prompts[language] || prompts.en}</Say>
       <Pause length="1"/>
       <Say voice="woman">${question.question_text}</Say>
-      <Record timeout="120" trimSilence="true" recordingStatusCallback="${process.env.BASE_URL}/voice/recording">
-        <Say voice="woman">Please speak after the beep.</Say>
+      <Record timeout="120" trimSilence="true" playBeep="true" callbackUrl="${process.env.BASE_URL}/voice/callback">
+        <Say voice="woman">${speakPrompt[language] || speakPrompt.en}</Say>
       </Record>
     `;
   }
@@ -275,6 +312,10 @@ class VoiceService {
         return;
       }
 
+      // Get call state to find current question
+      const callState = this.callStates.get(sessionId);
+      const currentQuestion = callState?.questions?.[callState?.currentQuestionIndex];
+
       // Update call with recording URL
       await db.query(`
         UPDATE voice_calls 
@@ -285,21 +326,29 @@ class VoiceService {
       // Create research response record
       await db.query(`
         INSERT INTO research_responses (
-          phone_number, response_type, audio_file_path, 
+          phone_number, question_id, response_type, audio_file_path, 
           voice_call_id, language, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       `, [
         call.phone_number,
+        currentQuestion?.id || null,
         'voice',
         recordingUrl,
         call.id,
         call.language,
-        JSON.stringify(recordingData)
+        JSON.stringify({
+          ...recordingData,
+          questionText: currentQuestion?.question_text,
+          questionNumber: (callState?.currentQuestionIndex || 0) + 1,
+          totalQuestions: callState?.questions?.length || 0
+        })
       ]);
 
       logger.voice(call.phone_number, 'recording_saved', {
         sessionId,
-        recordingUrl
+        recordingUrl,
+        questionId: currentQuestion?.id,
+        questionNumber: (callState?.currentQuestionIndex || 0) + 1
       });
 
     } catch (error) {

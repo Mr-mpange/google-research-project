@@ -94,7 +94,15 @@ class VoiceController {
         }
       });
 
-      res.json({ success: true });
+      // Generate response for next question or completion
+      const response = await voiceService.generateVoiceResponse({
+        sessionId,
+        phoneNumber: req.body.callerNumber || req.body.phoneNumber,
+        isActive: true
+      });
+
+      res.set('Content-Type', 'application/xml');
+      res.send(response);
 
     } catch (error) {
       logger.error('Recording callback error:', error);
