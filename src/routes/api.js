@@ -29,4 +29,7 @@ router.get('/analytics', apiController.getAnalytics);
 // AI processing
 router.post('/ai/process', authorize('admin', 'researcher'), apiController.processAI);
 
+// Test AI service
+router.post('/ai/test', authorize('admin', 'researcher'), apiController.testAI);
+
 module.exports = router;

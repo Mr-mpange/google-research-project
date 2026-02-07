@@ -386,6 +386,42 @@ class APIController {
     }
   }
 
+  // Test AI service (Gemini)
+  async testAI(req, res) {
+    try {
+      const { text = 'This is a test message for AI analysis.' } = req.body;
+
+      // Get AI service status
+      const status = aiService.getServiceStatus();
+
+      // Test Gemini if available
+      let geminiTest = null;
+      if (status.gemini.available) {
+        try {
+          geminiTest = await aiService.analyzeWithGemini(text, 'summary');
+        } catch (error) {
+          geminiTest = { error: error.message };
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'AI service test completed',
+        status,
+        geminiTest,
+        testText: text
+      });
+
+    } catch (error) {
+      logger.error('AI test API error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'AI test failed',
+        details: error.message 
+      });
+    }
+  }
+
   // Get system health status
   async getHealth(req, res) {
     try {
