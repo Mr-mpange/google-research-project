@@ -556,13 +556,25 @@ class USSDService {
   // Get active research questions
   async getActiveQuestions(language = 'en') {
     try {
-      const result = await db.query(`
-        SELECT id, title, question_text, category
+      // First try to get questions in the requested language
+      let result = await db.query(`
+        SELECT id, title, question_text, category, language
         FROM research_questions
         WHERE is_active = true AND language = $1
         ORDER BY created_at DESC
         LIMIT 10
       `, [language]);
+
+      // If no questions found in requested language, get all active questions
+      if (result.rows.length === 0) {
+        result = await db.query(`
+          SELECT id, title, question_text, category, language
+          FROM research_questions
+          WHERE is_active = true
+          ORDER BY created_at DESC
+          LIMIT 10
+        `);
+      }
 
       return result.rows;
     } catch (error) {

@@ -49,10 +49,15 @@ class APIController {
   // Create research question
   async createQuestion(req, res) {
     try {
+      // Set default language if not provided
+      if (!req.body.language) {
+        req.body.language = 'en';
+      }
+
       // Validate input
       await body('title').notEmpty().withMessage('Title is required').run(req);
       await body('question_text').notEmpty().withMessage('Question text is required').run(req);
-      await body('language').isIn(['en', 'sw']).withMessage('Language must be en or sw').run(req);
+      await body('language').optional().isIn(['en', 'sw']).withMessage('Language must be en or sw').run(req);
 
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -63,16 +68,19 @@ class APIController {
       }
 
       const { title, description, question_text, category, language = 'en' } = req.body;
+      
+      // Get user ID from request (may be undefined in development mode)
+      const createdBy = req.user?.id || req.user?.userId || null;
 
       const result = await db.query(`
         INSERT INTO research_questions (title, description, question_text, category, language, created_by)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
-      `, [title, description, question_text, category, language, req.user.userId]);
+      `, [title, description, question_text, category, language, createdBy]);
 
       logger.info('Question created', { 
         questionId: result.rows[0].id,
-        createdBy: req.user.userId 
+        createdBy: createdBy || 'anonymous'
       });
 
       res.status(201).json({

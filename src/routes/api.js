@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const apiController = require('../controllers/apiController');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
 const rateLimiter = require('../middleware/rateLimiter');
 
 // Apply API rate limiting
@@ -14,7 +14,8 @@ router.get('/health', apiController.getHealth);
 router.get('/ai-status', apiController.getAIStatus);
 
 // Protected routes (require authentication)
-router.use(authenticate);
+// In development mode, use optional auth to allow testing without login
+router.use(process.env.NODE_ENV === 'development' ? optionalAuth : authenticate);
 
 // Research questions
 router.get('/questions', apiController.getQuestions);
