@@ -383,14 +383,24 @@ class APIController {
   // Trigger AI processing for unprocessed responses
   async processAI(req, res) {
     try {
-      const { limit = 10 } = req.query;
+      const { limit = 10, type = 'all' } = req.query;
 
-      const processedCount = await aiService.batchProcessRecordings(parseInt(limit));
+      let voiceCount = 0;
+      let ussdCount = 0;
+
+      if (type === 'voice' || type === 'all') {
+        voiceCount = await aiService.batchProcessRecordings(parseInt(limit));
+      }
+
+      if (type === 'ussd' || type === 'all') {
+        ussdCount = await aiService.batchProcessUSSDResponses(parseInt(limit));
+      }
 
       res.json({
         success: true,
-        message: `Processed ${processedCount} recordings`,
-        processedCount
+        message: `Processed ${voiceCount} voice recordings and ${ussdCount} USSD responses`,
+        voiceProcessed: voiceCount,
+        ussdProcessed: ussdCount
       });
 
     } catch (error) {

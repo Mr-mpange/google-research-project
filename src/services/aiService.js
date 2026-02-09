@@ -544,6 +544,65 @@ Focus on extracting meaningful insights that would be valuable for research anal
     }
   }
 
+  // Batch process USSD text responses for sentiment analysis
+  async batchProcessUSSDResponses(limit = 50) {
+    try {
+      // Get unprocessed USSD responses (text responses without AI summaries)
+      const result = await db.query(`
+        SELECT r.*, q.question_text, q.title as question_title
+        FROM research_responses r
+        JOIN research_questions q ON r.question_id = q.id
+        LEFT JOIN ai_summaries s ON r.id = s.response_id
+        WHERE r.response_type = 'ussd' 
+          AND r.response_text IS NOT NULL
+          AND r.response_text != ''
+          AND s.id IS NULL
+        ORDER BY r.created_at ASC
+        LIMIT $1
+      `, [limit]);
+
+      const unprocessedResponses = result.rows;
+      
+      logger.ai('ussd_batch_processing_started', {
+        count: unprocessedResponses.length
+      });
+
+      let processedCount = 0;
+
+      for (const response of unprocessedResponses) {
+        try {
+          // Generate AI summary and sentiment for USSD text
+          const summary = await this.generateSummary(response.response_text, response);
+          
+          // Save summary (no transcription for USSD)
+          await this.saveSummary(response.id, null, summary);
+          
+          processedCount++;
+          
+          logger.ai('ussd_response_processed', {
+            responseId: response.id,
+            sentiment: summary.sentiment
+          });
+        } catch (error) {
+          logger.error('USSD batch processing item error:', {
+            responseId: response.id,
+            error: error.message
+          });
+        }
+      }
+
+      logger.ai('ussd_batch_processing_complete', {
+        processed: processedCount
+      });
+
+      return processedCount;
+
+    } catch (error) {
+      logger.error('USSD batch processing error:', error);
+      throw error;
+    }
+  }
+
   // Generate insights using Gemini AI
   async generateInsights(texts, context = {}) {
     try {
