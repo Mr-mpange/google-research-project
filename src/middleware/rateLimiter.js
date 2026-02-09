@@ -4,12 +4,14 @@ const logger = require('../utils/logger');
 // General rate limiter
 const generalLimiter = rateLimit({
   windowMs: (process.env.RATE_LIMIT_WINDOW || 15) * 60 * 1000, // 15 minutes
-  max: process.env.RATE_LIMIT_MAX || (process.env.NODE_ENV === 'development' ? 1000 : 100), // Higher limit in development
+  max: process.env.RATE_LIMIT_MAX || (process.env.NODE_ENV === 'development' ? 10000 : 1000), // Much higher limit
   message: {
     error: 'Too many requests from this IP, please try again later.'
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting validation for trust proxy in production (Cloud Run)
+  validate: { trustProxy: false },
   handler: (req, res) => {
     logger.security('Rate limit exceeded', {
       ip: req.ip,
@@ -30,6 +32,7 @@ const authLimiter = rateLimit({
     error: 'Too many authentication attempts, please try again later.'
   },
   skipSuccessfulRequests: true,
+  validate: { trustProxy: false },
   handler: (req, res) => {
     logger.security('Auth rate limit exceeded', {
       ip: req.ip,
@@ -49,6 +52,7 @@ const ussdLimiter = rateLimit({
   message: {
     error: 'USSD rate limit exceeded'
   },
+  validate: { trustProxy: false },
   handler: (req, res) => {
     logger.security('USSD rate limit exceeded', {
       ip: req.ip,
@@ -68,6 +72,7 @@ const voiceLimiter = rateLimit({
   message: {
     error: 'Voice rate limit exceeded'
   },
+  validate: { trustProxy: false },
   handler: (req, res) => {
     logger.security('Voice rate limit exceeded', {
       ip: req.ip,

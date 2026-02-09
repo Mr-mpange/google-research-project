@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../database/connection');
 const logger = require('../utils/logger');
+const cacheService = require('./cacheService');
 
 class AIService {
   constructor() {
@@ -19,10 +20,10 @@ class AIService {
     if (process.env.GEMINI_API_KEY) {
       this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
       this.geminiModel = this.genAI.getGenerativeModel({ 
-        model: process.env.GEMINI_MODEL || 'gemini-1.5-flash' 
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' 
       });
       this.geminiVisionModel = this.genAI.getGenerativeModel({ 
-        model: process.env.GEMINI_VISION_MODEL || 'gemini-1.5-flash' 
+        model: process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash' 
       });
     }
     
@@ -153,6 +154,16 @@ class AIService {
   // Generate AI summary of transcribed text using Gemini or OpenAI
   async generateSummary(text, responseContext = {}) {
     try {
+      // Generate cache key based on text hash and context
+      const cacheKey = `summary:${this.hashText(text)}:${responseContext.question_id || 'general'}`;
+      
+      // Try to get from cache
+      const cachedSummary = await cacheService.get(cacheKey);
+      if (cachedSummary) {
+        logger.info('Summary retrieved from cache');
+        return cachedSummary;
+      }
+
       const startTime = Date.now();
 
       let summaryText;
@@ -183,7 +194,7 @@ class AIService {
         processingDuration
       });
 
-      return {
+      const summary = {
         text: summaryText,
         keyPoints,
         themes,
@@ -193,6 +204,11 @@ class AIService {
         processingDuration,
         service: this.preferredAI
       };
+
+      // Cache the summary for 24 hours
+      await cacheService.set(cacheKey, summary, cacheService.TTL.VERY_LONG);
+
+      return summary;
 
     } catch (error) {
       logger.error('AI summary generation error:', error);
@@ -667,8 +683,8 @@ Focus on extracting meaningful insights that would be valuable for research anal
     return {
       gemini: {
         available: !!this.geminiModel,
-        model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
-        vision_model: process.env.GEMINI_VISION_MODEL || 'gemini-1.5-flash'
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+        vision_model: process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash'
       },
       openai: {
         available: !!this.openai,
@@ -677,6 +693,17 @@ Focus on extracting meaningful insights that would be valuable for research anal
       preferred: this.preferredAI,
       speech_to_text: process.env.STT_SERVICE || 'google'
     };
+  }
+
+  // Simple hash function for cache keys
+  hashText(text) {
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(36);
   }
 }
 

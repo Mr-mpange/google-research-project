@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const logger = require('./utils/logger');
 const database = require('./database/connection');
+const redisClient = require('./config/redis');
 const errorHandler = require('./middleware/errorHandler');
 const rateLimiter = require('./middleware/rateLimiter');
 
@@ -17,6 +18,7 @@ const smsRoutes = require('./routes/sms');
 const dashboardRoutes = require('./routes/dashboard');
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
+const cacheRoutes = require('./routes/cache');
 
 const app = express();
 const PORT = process.env.PORT || 8080; // Cloud Run uses 8080 by default
@@ -26,11 +28,38 @@ app.set('trust proxy', true);
 
 // Security middleware
 app.use(helmet());
+
+// CORS configuration - allow frontend origins
+const allowedOrigins = [
+  'http://localhost:8080',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://research-web-assistance.vercel.app',
+  ...(process.env.ALLOWED_ORIGINS?.split(',').filter(Boolean) || [])
+];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.ALLOWED_ORIGINS?.split(',') 
-    : true,
-  credentials: true
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    
+    // In development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    // In production, check against allowed origins
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400 // 24 hours
 }));
 
 // Rate limiting
@@ -52,11 +81,16 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  const redisHealth = redisClient.isReady();
+  
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0'
+    version: process.env.npm_package_version || '1.0.0',
+    services: {
+      redis: redisHealth ? 'connected' : 'disconnected'
+    }
   });
 });
 
@@ -88,6 +122,7 @@ app.use('/voice', voiceRoutes);
 app.use('/sms', smsRoutes);
 app.use('/auth', authRoutes);
 app.use('/api', apiRoutes);
+app.use('/api/cache', cacheRoutes);
 app.use('/', dashboardRoutes);
 
 // 404 handler
@@ -101,19 +136,36 @@ app.use(errorHandler);
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
+  await redisClient.disconnect();
   await database.end();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
+  await redisClient.disconnect();
   await database.end();
   process.exit(0);
 });
 
 // Start server
-app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
-});
+const startServer = async () => {
+  try {
+    // Initialize Redis
+    await redisClient.connect();
+    
+    app.listen(PORT, () => {
+      logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+    });
+  } catch (error) {
+    logger.error('Server startup error:', error);
+    // Continue without Redis if connection fails
+    app.listen(PORT, () => {
+      logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode (Redis unavailable)`);
+    });
+  }
+};
+
+startServer();
 
 module.exports = app;

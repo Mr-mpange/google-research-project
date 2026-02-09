@@ -7,25 +7,28 @@ class APIController {
   // Get research questions
   async getQuestions(req, res) {
     try {
-      const { language = 'en', category, active = true } = req.query;
+      const { language, category, active } = req.query;
 
       let query = 'SELECT * FROM research_questions WHERE 1=1';
       const params = [];
       let paramIndex = 1;
 
-      if (language) {
+      // Only filter by language if explicitly provided
+      if (language && language !== '') {
         query += ` AND language = $${paramIndex}`;
         params.push(language);
         paramIndex++;
       }
 
-      if (category) {
+      // Only filter by category if provided
+      if (category && category !== '') {
         query += ` AND category = $${paramIndex}`;
         params.push(category);
         paramIndex++;
       }
 
-      if (active !== undefined) {
+      // Only filter by active status if explicitly provided
+      if (active !== undefined && active !== '') {
         query += ` AND is_active = $${paramIndex}`;
         params.push(active === 'true');
         paramIndex++;
@@ -37,7 +40,9 @@ class APIController {
 
       res.json({
         success: true,
-        questions: result.rows
+        data: {
+          questions: result.rows
+        }
       });
 
     } catch (error) {
@@ -120,7 +125,7 @@ class APIController {
 
       logger.info('Question updated', { 
         questionId,
-        updatedBy: req.user.userId 
+        updatedBy: req.user?.userId || req.user?.id || 'anonymous'
       });
 
       res.json({
@@ -158,7 +163,7 @@ class APIController {
 
       logger.info('Question deleted', { 
         questionId,
-        deletedBy: req.user.userId 
+        deletedBy: req.user?.userId || req.user?.id || 'anonymous'
       });
 
       res.json({
@@ -471,6 +476,10 @@ class APIController {
       const dbResult = await db.query('SELECT NOW()');
       const dbHealthy = dbResult.rows.length > 0;
 
+      // Check question count
+      const questionCount = await db.query('SELECT COUNT(*) as count FROM research_questions');
+      const totalQuestions = parseInt(questionCount.rows[0]?.count || 0);
+
       // Check recent activity
       const recentActivity = await db.query(`
         SELECT COUNT(*) as count
@@ -493,6 +502,7 @@ class APIController {
           database: dbHealthy,
           timestamp: new Date().toISOString(),
           recentActivity: parseInt(recentActivity.rows[0].count),
+          totalQuestions,
           systemStats: systemStats.rows[0]
         }
       });
