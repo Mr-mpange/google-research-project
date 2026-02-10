@@ -1,10 +1,41 @@
 const db = require('./connection');
 const logger = require('../utils/logger');
+const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
 async function seedDatabase() {
   try {
     logger.info('Starting database seeding...');
+    
+    // Create default admin user
+    try {
+      const adminPassword = 'Admin@123';
+      const saltRounds = 12;
+      const password_hash = await bcrypt.hash(adminPassword, saltRounds);
+      
+      const existingAdmin = await db.query(
+        'SELECT id FROM users WHERE username = $1 OR email = $2',
+        ['admin', 'admin@research.com']
+      );
+      
+      if (existingAdmin.rows.length === 0) {
+        await db.query(`
+          INSERT INTO users (username, email, password_hash, full_name, role, is_active)
+          VALUES ($1, $2, $3, $4, 'admin', true)
+        `, ['admin', 'admin@research.com', password_hash, 'System Administrator']);
+        
+        logger.info('Default admin user created (username: admin, password: Admin@123)');
+        console.log('\n✅ Default admin user created:');
+        console.log('   Username: admin');
+        console.log('   Password: Admin@123');
+        console.log('   Email: admin@research.com');
+        console.log('   ⚠️  Please change the password after first login!\n');
+      } else {
+        logger.info('Admin user already exists, skipping creation');
+      }
+    } catch (error) {
+      logger.error('Error creating admin user:', error);
+    }
     
     // Add sample research questions
     const questions = [

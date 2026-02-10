@@ -15,6 +15,10 @@ router.get('/ai-status', cacheMiddleware(60), apiController.getAIStatus);
 // Database migration endpoint (temporary - for setup only, make it public)
 router.post('/migrate', publicController.runMigration);
 
+// Database seed endpoint (temporary - for setup only)
+const seedController = require('../controllers/seedController');
+router.post('/seed', seedController.runSeed);
+
 // Public endpoints (NO authentication required)
 router.post('/contact', rateLimiter.general, publicController.submitContactForm);
 router.post('/newsletter/subscribe', rateLimiter.general, publicController.subscribeNewsletter);
