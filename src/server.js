@@ -19,6 +19,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 const cacheRoutes = require('./routes/cache');
+const usersRoutes = require('./routes/users');
 
 const app = express();
 const PORT = process.env.PORT || 8080; // Cloud Run uses 8080 by default
@@ -123,6 +124,7 @@ app.use('/sms', smsRoutes);
 app.use('/auth', authRoutes);
 app.use('/api', apiRoutes);
 app.use('/api/cache', cacheRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/', dashboardRoutes);
 
 // 404 handler
