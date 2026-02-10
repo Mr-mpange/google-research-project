@@ -1,18 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const apiController = require('../controllers/apiController');
+const publicController = require('../controllers/publicController');
 const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
 const rateLimiter = require('../middleware/rateLimiter');
 const { cacheMiddleware, invalidateCache } = require('../middleware/cacheMiddleware');
-
-// Apply API rate limiting
-router.use(rateLimiter.general);
 
 // Public health check
 router.get('/health', apiController.getHealth);
 
 // Public AI test (for debugging)
 router.get('/ai-status', cacheMiddleware(60), apiController.getAIStatus);
+
+// Database migration endpoint (temporary - for setup only, make it public)
+router.post('/migrate', publicController.runMigration);
+
+// Public endpoints (NO authentication required)
+router.post('/contact', rateLimiter.general, publicController.submitContactForm);
+router.post('/newsletter/subscribe', rateLimiter.general, publicController.subscribeNewsletter);
+router.get('/whitepapers/:filename', publicController.getWhitepaper);
 
 // Public questions endpoint (read-only)
 router.get('/questions', cacheMiddleware(1800), apiController.getQuestions);
@@ -43,8 +49,10 @@ router.post('/ai/process',
 );
 
 // Protected routes (require authentication)
-// In development mode, use optional auth to allow testing without login
-router.use(process.env.NODE_ENV === 'development' ? optionalAuth : authenticate);
+router.use(authenticate);
+
+// User profile update (authenticated)
+router.put('/users/:userId', publicController.updateUserProfile);
 
 // Test AI service
 router.post('/ai/test', authorize('admin', 'researcher'), apiController.testAI);
