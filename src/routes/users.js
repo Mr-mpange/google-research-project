@@ -6,6 +6,15 @@ const { authenticate, authorize } = require('../middleware/auth');
 // All routes require authentication
 router.use(authenticate);
 
+// Get pending users (admin only)
+router.get('/pending/list', authorize('admin'), usersController.getPendingUsers);
+
+// Approve user (admin only)
+router.post('/:userId/approve', authorize('admin'), usersController.approveUser);
+
+// Reject user (admin only)
+router.post('/:userId/reject', authorize('admin'), usersController.rejectUser);
+
 // Get all users (admin only)
 router.get('/', authorize('admin'), usersController.getAllUsers);
 

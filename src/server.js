@@ -20,6 +20,7 @@ const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 const cacheRoutes = require('./routes/cache');
 const usersRoutes = require('./routes/users');
+const migrationRoutes = require('./routes/migration');
 
 const app = express();
 const PORT = process.env.PORT || 8080; // Cloud Run uses 8080 by default
@@ -88,7 +89,7 @@ app.get('/health', async (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0',
+    version: process.env.npm_package_version || '1.0.2', // Updated with approval system
     services: {
       redis: redisHealth ? 'connected' : 'disconnected'
     }
@@ -125,6 +126,7 @@ app.use('/auth', authRoutes);
 app.use('/api', apiRoutes);
 app.use('/api/cache', cacheRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/migration', migrationRoutes);
 app.use('/', dashboardRoutes);
 
 // 404 handler

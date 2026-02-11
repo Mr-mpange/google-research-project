@@ -182,6 +182,9 @@ class SMSController {
 
     } catch (error) {
       logger.error('Get SMS statistics error:', error);
+      res.status(500).json({ error: 'Failed to get SMS statistics' });
+    }
+  }
 
   // Send bulk SMS to all participants
   async sendBulkMessage(req, res) {

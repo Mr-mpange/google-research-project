@@ -44,6 +44,41 @@ class AuthController {
         return res.status(401).json({ error: 'Account is deactivated' });
       }
 
+      // Check user status (pending, active, inactive, rejected)
+      const status = user.status || 'active'; // Default to active for existing users
+      if (status === 'pending') {
+        logger.security('Login attempt with pending account', { 
+          userId: user.id, 
+          username: user.username 
+        });
+        return res.status(403).json({ 
+          error: 'Account pending approval', 
+          message: 'Your account is waiting for admin approval. You will be notified once approved.' 
+        });
+      }
+      
+      if (status === 'rejected') {
+        logger.security('Login attempt with rejected account', { 
+          userId: user.id, 
+          username: user.username 
+        });
+        return res.status(403).json({ 
+          error: 'Account rejected', 
+          message: 'Your account registration was not approved.' 
+        });
+      }
+      
+      if (status === 'inactive') {
+        logger.security('Login attempt with inactive account', { 
+          userId: user.id, 
+          username: user.username 
+        });
+        return res.status(403).json({ 
+          error: 'Account inactive', 
+          message: 'Your account has been deactivated. Please contact support.' 
+        });
+      }
+
       // Verify password
       const isValidPassword = await bcrypt.compare(password, user.password_hash);
       if (!isValidPassword) {
@@ -133,24 +168,34 @@ class AuthController {
       const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
       const password_hash = await bcrypt.hash(password, saltRounds);
 
+      // Set status based on role
+      // Admins are auto-approved, researchers need approval
+      const status = role === 'admin' ? 'active' : 'pending';
+
       // Create user
       const result = await db.query(`
-        INSERT INTO users (username, email, password_hash, full_name, role)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, username, email, full_name, role, is_active, created_at
-      `, [username, email, password_hash, full_name, role]);
+        INSERT INTO users (username, email, password_hash, full_name, role, status)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, username, email, full_name, role, status, is_active, created_at
+      `, [username, email, password_hash, full_name, role, status]);
 
       const newUser = result.rows[0];
 
       logger.info('User registered successfully', { 
         userId: newUser.id, 
-        username: newUser.username 
+        username: newUser.username,
+        status: newUser.status
       });
+
+      const message = status === 'pending' 
+        ? 'Registration successful! Your account is pending admin approval. You will be notified once approved.'
+        : 'User registered successfully';
 
       res.status(201).json({
         success: true,
-        message: 'User registered successfully',
-        user: newUser
+        message,
+        user: newUser,
+        requiresApproval: status === 'pending'
       });
 
     } catch (error) {

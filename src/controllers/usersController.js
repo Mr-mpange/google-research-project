@@ -7,9 +7,18 @@ class UsersController {
   async getAllUsers(req, res) {
     try {
       const result = await db.query(`
-        SELECT id, username, email, full_name, role, is_active, created_at, updated_at
+        SELECT id, username, email, full_name, role, status, is_active, 
+               approval_date, approved_by, created_at, updated_at
         FROM users
-        ORDER BY created_at DESC
+        ORDER BY 
+          CASE 
+            WHEN status = 'pending' THEN 1
+            WHEN status = 'active' THEN 2
+            WHEN status = 'inactive' THEN 3
+            WHEN status = 'rejected' THEN 4
+            ELSE 5
+          END,
+          created_at DESC
       `);
 
       res.json({
@@ -276,6 +285,101 @@ class UsersController {
       res.status(500).json({ error: 'Failed to change password' });
     }
   }
+
+  // Approve user (admin only)
+  async approveUser(req, res) {
+    try {
+      const { userId } = req.params;
+
+      const result = await db.query(`
+        UPDATE users
+        SET status = 'active',
+            approval_date = CURRENT_TIMESTAMP,
+            approved_by = $1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2 AND status = 'pending'
+        RETURNING id, username, email, full_name, role, status
+      `, [req.user.id, userId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found or not pending approval' });
+      }
+
+      logger.info('User approved', { 
+        userId, 
+        username: result.rows[0].username,
+        approvedBy: req.user.id 
+      });
+
+      res.json({
+        success: true,
+        message: 'User approved successfully',
+        user: result.rows[0]
+      });
+    } catch (error) {
+      logger.error('Approve user error:', error);
+      res.status(500).json({ error: 'Failed to approve user' });
+    }
+  }
+
+  // Reject user (admin only)
+  async rejectUser(req, res) {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+
+      const result = await db.query(`
+        UPDATE users
+        SET status = 'rejected',
+            rejection_reason = $1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2 AND status = 'pending'
+        RETURNING id, username, email, full_name, role, status
+      `, [reason || 'Not approved by administrator', userId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found or not pending approval' });
+      }
+
+      logger.info('User rejected', { 
+        userId, 
+        username: result.rows[0].username,
+        rejectedBy: req.user.id,
+        reason 
+      });
+
+      res.json({
+        success: true,
+        message: 'User rejected',
+        user: result.rows[0]
+      });
+    } catch (error) {
+      logger.error('Reject user error:', error);
+      res.status(500).json({ error: 'Failed to reject user' });
+    }
+  }
+
+  // Get pending users (admin only)
+  async getPendingUsers(req, res) {
+    try {
+      const result = await db.query(`
+        SELECT id, username, email, full_name, role, status, created_at
+        FROM users
+        WHERE status = 'pending'
+        ORDER BY created_at ASC
+      `);
+
+      res.json({
+        success: true,
+        users: result.rows,
+        count: result.rows.length
+      });
+    } catch (error) {
+      logger.error('Get pending users error:', error);
+      res.status(500).json({ error: 'Failed to fetch pending users' });
+    }
+  }
 }
 
 module.exports = new UsersController();
+
