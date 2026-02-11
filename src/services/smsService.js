@@ -43,6 +43,69 @@ class SMSService {
     }
   }
 
+  // Send custom SMS message
+  async sendCustomSMS(phoneNumber, message, language = 'en') {
+    try {
+      // Clean and format phone number
+      const cleanPhoneNumber = this.formatPhoneNumber(phoneNumber);
+      
+      logger.info('Sending custom SMS', {
+        originalPhone: phoneNumber,
+        cleanPhone: cleanPhoneNumber,
+        language,
+        messageLength: message.length
+      });
+
+      const sendOptions = {
+        to: cleanPhoneNumber,
+        message: message
+      };
+      
+      // Only add 'from' if shortcode is available
+      if (process.env.AT_SHORTCODE) {
+        sendOptions.from = process.env.AT_SHORTCODE;
+      }
+
+      const result = await this.sms.send(sendOptions);
+
+      const recipient = result.SMSMessageData?.Recipients?.[0];
+      
+      if (recipient) {
+        logger.info('Custom SMS sent successfully', {
+          phoneNumber: cleanPhoneNumber,
+          messageId: recipient.messageId,
+          status: recipient.status,
+          statusCode: recipient.statusCode,
+          cost: recipient.cost
+        });
+
+        return {
+          success: true,
+          messageId: recipient.messageId,
+          status: recipient.status,
+          statusCode: recipient.statusCode,
+          cost: recipient.cost,
+          phoneNumber: cleanPhoneNumber,
+          message: message
+        };
+      } else {
+        throw new Error('No recipient data in SMS response');
+      }
+
+    } catch (error) {
+      logger.error('Failed to send custom SMS', {
+        phoneNumber,
+        error: error.message
+      });
+
+      return {
+        success: false,
+        error: error.message,
+        phoneNumber
+      };
+    }
+  }
+
   // Send thank you SMS after research completion
   async sendThankYouSMS(phoneNumber, language = 'en', responseDetails = {}) {
     try {
@@ -101,7 +164,8 @@ class SMSService {
           status: recipient.status,
           statusCode: recipient.statusCode,
           cost: recipient.cost,
-          phoneNumber: cleanPhoneNumber
+          phoneNumber: cleanPhoneNumber,
+          message: message
         };
       } else {
         throw new Error('No recipient data in SMS response');
@@ -264,8 +328,16 @@ ${process.env.ORGANIZATION_NAME || 'Utafiti wa Jamii'}`
         messageLength: message.length
       });
 
+      // Format all phone numbers before sending
+      const formattedNumbers = phoneNumbers.map(phone => this.formatPhoneNumber(phone));
+
+      logger.info('Formatted phone numbers', {
+        original: phoneNumbers,
+        formatted: formattedNumbers
+      });
+
       const sendOptions = {
-        to: phoneNumbers,
+        to: formattedNumbers,
         message: message
       };
       

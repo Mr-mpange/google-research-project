@@ -62,7 +62,7 @@ class SMSController {
   // Send thank you SMS manually (for testing or admin use)
   async sendThankYou(req, res) {
     try {
-      const { phoneNumber, language = 'en', questionTitle } = req.body;
+      const { phoneNumber, message, language = 'en', questionTitle } = req.body;
 
       if (!phoneNumber) {
         return res.status(400).json({
@@ -70,20 +70,60 @@ class SMSController {
         });
       }
 
-      const result = await smsService.sendThankYouSMS(phoneNumber, language, {
-        questionTitle: questionTitle || 'Research Question'
-      });
+      // If custom message provided, use it; otherwise use default thank you message
+      let smsMessage = message;
+      let result;
+
+      if (smsMessage) {
+        // Send custom message directly
+        result = await smsService.sendCustomSMS(phoneNumber, smsMessage, language);
+      } else {
+        // Send default thank you message
+        result = await smsService.sendThankYouSMS(phoneNumber, language, {
+          questionTitle: questionTitle || 'Research Question'
+        });
+      }
 
       if (result.success) {
+        // Log to SMS history
+        await db.query(`
+          INSERT INTO sms_history (phone_number, message, message_type, status, message_id, cost, status_code, language, sent_by)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `, [
+          result.phoneNumber,
+          smsMessage || result.message || 'Thank you SMS',
+          'manual',
+          'sent',
+          result.messageId,
+          result.cost,
+          result.statusCode,
+          language,
+          req.user?.userId || null
+        ]);
+
         res.json({
-          message: 'Thank you SMS sent successfully',
+          message: 'SMS sent successfully',
           messageId: result.messageId,
           status: result.status,
           cost: result.cost
         });
       } else {
+        // Log failed attempt
+        await db.query(`
+          INSERT INTO sms_history (phone_number, message, message_type, status, language, sent_by, failure_reason)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [
+          phoneNumber,
+          smsMessage || 'Thank you SMS',
+          'manual',
+          'failed',
+          language,
+          req.user?.userId || null,
+          result.error
+        ]);
+
         res.status(500).json({
-          error: 'Failed to send thank you SMS',
+          error: 'Failed to send SMS',
           details: result.error
         });
       }
@@ -91,7 +131,7 @@ class SMSController {
     } catch (error) {
       logger.error('Send thank you SMS error:', error);
       res.status(500).json({
-        error: 'Failed to send thank you SMS',
+        error: 'Failed to send SMS',
         details: error.message
       });
     }
@@ -102,15 +142,7 @@ class SMSController {
     try {
       const { startDate, endDate } = req.query;
       
-      let dateFilter = '';
-      const params = [];
-      
-      if (startDate && endDate) {
-        dateFilter = 'WHERE rr.created_at BETWEEN $1 AND $2';
-        params.push(startDate, endDate);
-      }
-
-      // Get today's SMS count (responses created today)
+      // Get today's SMS count (from sms_history)
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       
@@ -119,44 +151,54 @@ class SMSController {
       
       const todayCount = await db.query(`
         SELECT COUNT(*) as count
-        FROM research_responses
-        WHERE created_at >= $1
+        FROM sms_history
+        WHERE sent_at >= $1 AND status = 'sent'
       `, [todayStart]);
 
       const yesterdayCount = await db.query(`
         SELECT COUNT(*) as count
-        FROM research_responses
-        WHERE created_at >= $1 AND created_at < $2
+        FROM sms_history
+        WHERE sent_at >= $1 AND sent_at < $2 AND status = 'sent'
       `, [yesterdayStart, todayStart]);
 
       // Get total unique recipients
       const totalRecipients = await db.query(`
         SELECT COUNT(DISTINCT phone_number) as count
-        FROM research_responses
+        FROM sms_history
+        WHERE status = 'sent'
       `);
 
-      // Get last 30 days delivery rate (assume 98% success rate based on responses)
+      // Get last 30 days count and calculate delivery rate
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
-      const last30DaysCount = await db.query(`
-        SELECT COUNT(*) as count
-        FROM research_responses
-        WHERE created_at >= $1
+      const last30DaysStats = await db.query(`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
+          COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed
+        FROM sms_history
+        WHERE sent_at >= $1
       `, [thirtyDaysAgo]);
 
-      // Get recent SMS activity (last 10 responses)
+      const totalSent = parseInt(last30DaysStats.rows[0].sent) || 0;
+      const totalAttempted = parseInt(last30DaysStats.rows[0].total) || 1;
+      const deliveryRate = ((totalSent / totalAttempted) * 100).toFixed(1);
+
+      // Get recent SMS activity (last 10 sent messages)
       const recentActivity = await db.query(`
         SELECT 
-          rr.phone_number,
-          rr.response_type,
-          rr.language,
-          rr.created_at,
-          rq.title as question_title,
-          rr.response_text
-        FROM research_responses rr
-        LEFT JOIN research_questions rq ON rr.question_id = rq.id
-        ORDER BY rr.created_at DESC
+          sh.phone_number,
+          sh.message,
+          sh.message_type,
+          sh.status,
+          sh.sent_at as created_at,
+          sh.cost,
+          u.username as sent_by_username
+        FROM sms_history sh
+        LEFT JOIN users u ON sh.sent_by = u.id
+        WHERE sh.status = 'sent'
+        ORDER BY sh.sent_at DESC
         LIMIT 10
       `);
 
@@ -174,8 +216,8 @@ class SMSController {
           yesterdayCount: yesterdayTotal,
           percentageChange: parseFloat(percentageChange),
           totalRecipients: parseInt(totalRecipients.rows[0].count) || 0,
-          last30DaysCount: parseInt(last30DaysCount.rows[0].count) || 0,
-          deliveryRate: 98.5 // Estimated based on typical SMS delivery rates
+          last30DaysCount: totalSent,
+          deliveryRate: parseFloat(deliveryRate)
         },
         recentActivity: recentActivity.rows
       });
@@ -189,7 +231,7 @@ class SMSController {
   // Send bulk SMS to all participants
   async sendBulkMessage(req, res) {
     try {
-      const { message, language = 'en', targetGroup = 'all' } = req.body;
+      const { message, phoneNumbers, language = 'en', targetGroup = 'all' } = req.body;
 
       if (!message) {
         return res.status(400).json({
@@ -197,41 +239,73 @@ class SMSController {
         });
       }
 
-      // Get phone numbers based on target group
-      let phoneNumbersQuery = `
-        SELECT DISTINCT phone_number 
-        FROM research_responses 
-        WHERE phone_number IS NOT NULL
-      `;
-      
-      const params = [];
-      
-      if (targetGroup === 'recent') {
-        phoneNumbersQuery += ` AND created_at >= NOW() - INTERVAL '7 days'`;
-      } else if (targetGroup === 'language') {
-        phoneNumbersQuery += ` AND language = $1`;
-        params.push(language);
+      let recipientNumbers = [];
+
+      // If phoneNumbers array is provided (from frontend selection), use it
+      if (phoneNumbers && Array.isArray(phoneNumbers) && phoneNumbers.length > 0) {
+        recipientNumbers = phoneNumbers;
+        logger.info('Using provided phone numbers', {
+          count: phoneNumbers.length
+        });
+      } else {
+        // Otherwise, get phone numbers based on target group from database
+        let phoneNumbersQuery = `
+          SELECT DISTINCT phone_number 
+          FROM research_responses 
+          WHERE phone_number IS NOT NULL
+        `;
+        
+        const params = [];
+        
+        if (targetGroup === 'recent') {
+          phoneNumbersQuery += ` AND created_at >= NOW() - INTERVAL '7 days'`;
+        } else if (targetGroup === 'language') {
+          phoneNumbersQuery += ` AND language = $1`;
+          params.push(language);
+        }
+        
+        phoneNumbersQuery += ` ORDER BY phone_number`;
+
+        const phoneNumbersResult = await db.query(phoneNumbersQuery, params);
+        recipientNumbers = phoneNumbersResult.rows.map(row => row.phone_number);
       }
-      
-      phoneNumbersQuery += ` ORDER BY phone_number`;
 
-      const phoneNumbersResult = await db.query(phoneNumbersQuery, params);
-      const phoneNumbers = phoneNumbersResult.rows.map(row => row.phone_number);
-
-      if (phoneNumbers.length === 0) {
+      if (recipientNumbers.length === 0) {
         return res.status(400).json({
           error: 'No phone numbers found for the specified criteria'
         });
       }
 
       logger.info('Sending bulk SMS', {
-        recipientCount: phoneNumbers.length,
+        recipientCount: recipientNumbers.length,
         targetGroup,
         language,
         messageLength: message.length
       });
 
-      const result = await smsService.sendBulkSMS(phoneNumbers, message, language);
+      const result = await smsService.sendBulkSMS(recipientNumbers, message, language);
+
+      // Log each SMS to history
+      if (result.success && result.recipients) {
+        const insertPromises = result.recipients.map(recipient => {
+          return db.query(`
+            INSERT INTO sms_history (phone_number, message, message_type, status, message_id, cost, status_code, language, sent_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `, [
+            recipient.number || recipient.phoneNumber,
+            message,
+            'bulk',
+            recipient.status === 'Success' ? 'sent' : 'failed',
+            recipient.messageId,
+            recipient.cost,
+            recipient.statusCode,
+            language,
+            req.user?.userId || null
+          ]);
+        });
+
+        await Promise.all(insertPromises);
+      }
 
       res.json({
         message: 'Bulk SMS sending completed',

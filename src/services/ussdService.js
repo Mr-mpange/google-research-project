@@ -477,21 +477,82 @@ class USSDService {
         questionTitle: questionDetails.title
       });
 
-      await smsService.sendThankYouSMS(cleanPhoneNumber, language, {
+      const result = await smsService.sendThankYouSMS(cleanPhoneNumber, language, {
         questionTitle: questionDetails.title,
         questionText: questionDetails.question_text
       });
       
       logger.info('Thank you SMS sent successfully', {
         phoneNumber: cleanPhoneNumber,
-        questionTitle: questionDetails.title
+        questionTitle: questionDetails.title,
+        result
       });
+
+      // Log to SMS history table
+      if (result.success) {
+        await db.query(`
+          INSERT INTO sms_history (phone_number, message, message_type, status, message_id, cost, status_code, language)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [
+          result.phoneNumber,
+          result.message,
+          'thank_you',
+          'sent',
+          result.messageId,
+          result.cost,
+          result.statusCode,
+          language
+        ]);
+
+        logger.info('Thank you SMS logged to history', {
+          phoneNumber: result.phoneNumber,
+          messageId: result.messageId
+        });
+      } else {
+        // Log failed attempt
+        await db.query(`
+          INSERT INTO sms_history (phone_number, message, message_type, status, language, failure_reason)
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [
+          cleanPhoneNumber,
+          'Thank you SMS',
+          'thank_you',
+          'failed',
+          language,
+          result.error
+        ]);
+
+        logger.error('Thank you SMS failed and logged', {
+          phoneNumber: cleanPhoneNumber,
+          error: result.error
+        });
+      }
     } catch (error) {
       logger.error('Thank you SMS failed', {
         phoneNumber,
         error: error.message,
         stack: error.stack
       });
+
+      // Log failed attempt to history
+      try {
+        await db.query(`
+          INSERT INTO sms_history (phone_number, message, message_type, status, language, failure_reason)
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [
+          phoneNumber,
+          'Thank you SMS',
+          'thank_you',
+          'failed',
+          language,
+          error.message
+        ]);
+      } catch (dbError) {
+        logger.error('Failed to log SMS error to history', {
+          phoneNumber,
+          dbError: dbError.message
+        });
+      }
     }
   }
 
