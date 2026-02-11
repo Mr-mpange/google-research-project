@@ -61,10 +61,11 @@ class SMSService {
         message: message
       };
       
-      // Only add 'from' if shortcode is available
-      if (process.env.AT_SHORTCODE) {
-        sendOptions.from = process.env.AT_SHORTCODE;
-      }
+      // Don't use sender ID - let Africa's Talking use default
+      // Sender IDs need to be approved by Africa's Talking
+      // if (process.env.AT_SHORTCODE) {
+      //   sendOptions.from = process.env.AT_SHORTCODE;
+      // }
 
       const result = await this.sms.send(sendOptions);
 
@@ -129,10 +130,10 @@ class SMSService {
         message: message
       };
       
-      // Only add 'from' if shortcode is available
-      if (process.env.AT_SHORTCODE) {
-        sendOptions.from = process.env.AT_SHORTCODE;
-      }
+      // Don't use sender ID - let Africa's Talking use default
+      // if (process.env.AT_SHORTCODE) {
+      //   sendOptions.from = process.env.AT_SHORTCODE;
+      // }
 
       logger.info('SMS send options', { 
         to: sendOptions.to, 
@@ -243,10 +244,10 @@ class SMSService {
         message: message
       };
       
-      // Only add 'from' if shortcode is available
-      if (process.env.AT_SHORTCODE) {
-        sendOptions.from = process.env.AT_SHORTCODE;
-      }
+      // Don't use sender ID - let Africa's Talking use default
+      // if (process.env.AT_SHORTCODE) {
+      //   sendOptions.from = process.env.AT_SHORTCODE;
+      // }
 
       const result = await this.sms.send(sendOptions);
 
@@ -341,10 +342,10 @@ ${process.env.ORGANIZATION_NAME || 'Utafiti wa Jamii'}`
         message: message
       };
       
-      // Only add 'from' if shortcode is available
-      if (process.env.AT_SHORTCODE) {
-        sendOptions.from = process.env.AT_SHORTCODE;
-      }
+      // Don't use sender ID - let Africa's Talking use default
+      // if (process.env.AT_SHORTCODE) {
+      //   sendOptions.from = process.env.AT_SHORTCODE;
+      // }
 
       const result = await this.sms.send(sendOptions);
 
